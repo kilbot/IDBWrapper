@@ -24,6 +24,7 @@
     throw error;
   };
   var defaultSuccessHandler = function () {};
+  var defaultVersionChangeHandler = function () {};
 
   var defaults = {
     storeName: 'Store',
@@ -34,6 +35,7 @@
     onStoreReady: function () {
     },
     onError: defaultErrorHandler,
+    onVersionChange: defaultVersionChangeHandler,
     indexes: []
   };
 
@@ -352,15 +354,6 @@
 
         if(this.db.objectStoreNames.contains(this.storeName)){
           this.store = event.target.transaction.objectStore(this.storeName);
-
-          /**
-           * Special case for WooCommerce POS
-           * clear the database on updates
-           */
-          this.store.clear();
-          /**
-           *
-           */
         } else {
           var optionalParameters = { autoIncrement: this.autoIncrement };
           if (this.keyPath !== null) {
@@ -368,6 +361,11 @@
           }
           this.store = this.db.createObjectStore(this.storeName, optionalParameters);
         }
+
+        /**
+         * Trigger onVersionChange method
+         */
+        this.onVersionChange(this.store, event);
 
         var existingIndexes = Array.prototype.slice.call(this.getIndexList());
         this.indexes.forEach(function(indexData){

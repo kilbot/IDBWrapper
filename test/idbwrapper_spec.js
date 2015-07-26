@@ -741,7 +741,10 @@ describe('IDBWrapper', function(){
 
       store = new IDBStore({
         storeName: 'spec-store-update',
-        dbVersion: 3
+        dbVersion: 3,
+        onVersionChange: function(store){
+          store.clear();
+        }
       }, onSuccess);
 
     });
