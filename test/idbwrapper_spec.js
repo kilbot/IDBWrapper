@@ -730,7 +730,7 @@ describe('IDBWrapper', function(){
 
     });
 
-    it('should clear records on version change', function(done){
+    it('should trigger onVersionChange method on version change', function(done){
 
       var onSuccess = function(){
         store.count( function(count){
