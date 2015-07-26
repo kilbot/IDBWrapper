@@ -695,4 +695,61 @@ describe('IDBWrapper', function(){
 
   });
 
+  describe('version change', function(){
+
+    var store;
+    var dataArray = [
+      {
+        id: 1,
+        name: 'John'
+      },
+      {
+        id: 2,
+        name: 'Joe'
+      },
+      {
+        id: 3,
+        name: 'James'
+      }
+    ];
+
+    before(function(done){
+
+      var onSuccess = function(){
+        store.putBatch(dataArray, function(result){
+          expect(result).to.be.ok;
+          store.db.close();
+          done();
+        }, done);
+      };
+
+      store = new IDBStore({
+        storeName: 'spec-store-update',
+        dbVersion: 2
+      }, onSuccess);
+
+    });
+
+    it('should clear records on version change', function(done){
+
+      var onSuccess = function(){
+        store.count( function(count){
+          expect(count).to.equal(0);
+          done();
+        });
+      }
+
+      store = new IDBStore({
+        storeName: 'spec-store-update',
+        dbVersion: 3
+      }, onSuccess);
+
+    });
+
+    after(function(){
+      indexedDB.deleteDatabase('IDBWrapper-spec-store-update');
+    });
+
+  });
+
 });

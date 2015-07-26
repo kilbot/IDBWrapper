@@ -1,1 +1,3 @@
 test/polyfills
+.idea
+node_modules

@@ -352,6 +352,15 @@
 
         if(this.db.objectStoreNames.contains(this.storeName)){
           this.store = event.target.transaction.objectStore(this.storeName);
+
+          /**
+           * Special case for WooCommerce POS
+           * clear the database on updates
+           */
+          this.store.clear();
+          /**
+           *
+           */
         } else {
           var optionalParameters = { autoIncrement: this.autoIncrement };
           if (this.keyPath !== null) {
