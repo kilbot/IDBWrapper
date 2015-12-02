@@ -2,6 +2,7 @@
 
 /**
  * @license IDBWrapper - A cross-browser wrapper for IndexedDB
+ * Version 1.6.1
  * Copyright (c) 2011 - 2015 Jens Arps
  * http://jensarps.de/
  *
@@ -35,8 +36,13 @@
     onStoreReady: function () {
     },
     onError: defaultErrorHandler,
-    onVersionChange: defaultVersionChangeHandler,
-    indexes: []
+    indexes: [],
+    implementationPreference: [
+      'indexedDB',
+      'webkitIndexedDB',
+      'mozIndexedDB',
+      'shimIndexedDB'
+    ]
   };
 
   /**
@@ -45,7 +51,7 @@
    *
    * @constructor
    * @name IDBStore
-   * @version 1.5
+   * @version 1.6.1
    *
    * @param {Object} [kwArgs] An options object used to configure the store and
    *  set callbacks
@@ -74,6 +80,7 @@
    * @param {String} [kwArgs.indexes.indexData.keyPath] The key path of the index
    * @param {Boolean} [kwArgs.indexes.indexData.unique] Whether the index is unique
    * @param {Boolean} [kwArgs.indexes.indexData.multiEntry] Whether the index is multi entry
+   * @param {Array} [kwArgs.implementationPreference=['indexedDB','webkitIndexedDB','mozIndexedDB','shimIndexedDB']] An array of strings naming implementations to be used, in order or preference
    * @param {Function} [onStoreReady] A callback to be called when the store
    * is ready to be used.
    * @example
@@ -117,12 +124,12 @@
     onStoreReady && (this.onStoreReady = onStoreReady);
 
     var env = typeof window == 'object' ? window : self;
-    this.idb = env.indexedDB || env.webkitIndexedDB || env.mozIndexedDB || env.shimIndexedDB;
+    var availableImplementations = this.implementationPreference.filter(function (implName) {
+      return implName in env;
+    });
+    this.implementation = availableImplementations[0];
+    this.idb = env[this.implementation];
     this.keyRange = env.IDBKeyRange || env.webkitIDBKeyRange || env.mozIDBKeyRange;
-
-    this.features = {
-      hasAutoIncrement: !env.mozIndexedDB
-    };
 
     this.consts = {
       'READ_ONLY':         'readonly',
@@ -142,21 +149,22 @@
     /**
      * A pointer to the IDBStore ctor
      *
-     * @type IDBStore
+     * @private
+     * @type {Function}
      */
     constructor: IDBStore,
 
     /**
      * The version of IDBStore
      *
-     * @type String
+     * @type {String}
      */
-    version: '1.5',
+    version: '1.6.1',
 
     /**
      * A reference to the IndexedDB object
      *
-     * @type Object
+     * @type {Object}
      */
     db: null,
 
@@ -164,72 +172,77 @@
      * The full name of the IndexedDB used by IDBStore, composed of
      * this.storePrefix + this.storeName
      *
-     * @type String
+     * @type {String}
      */
     dbName: null,
 
     /**
      * The version of the IndexedDB used by IDBStore
      *
-     * @type Number
+     * @type {Number}
      */
     dbVersion: null,
 
     /**
      * A reference to the objectStore used by IDBStore
      *
-     * @type Object
+     * @type {Object}
      */
     store: null,
 
     /**
      * The store name
      *
-     * @type String
+     * @type {String}
      */
     storeName: null,
 
     /**
      * The prefix to prepend to the store name
      *
-     * @type String
+     * @type {String}
      */
     storePrefix: null,
 
     /**
      * The key path
      *
-     * @type String
+     * @type {String}
      */
     keyPath: null,
 
     /**
      * Whether IDBStore uses autoIncrement
      *
-     * @type Boolean
+     * @type {Boolean}
      */
     autoIncrement: null,
 
     /**
      * The indexes used by IDBStore
      *
-     * @type Array
+     * @type {Array}
      */
     indexes: null,
 
     /**
-     * A hashmap of features of the used IDB implementation
+     * The implemantations to try to use, in order of preference
      *
-     * @type Object
-     * @proprty {Boolean} autoIncrement If the implementation supports
-     *  native auto increment
+     * @type {Array}
      */
-    features: null,
+    implementationPreference: null,
+
+    /**
+     * The actual implementation being used
+     *
+     * @type {String}
+     */
+    implementation: '',
 
     /**
      * The callback to be called when the store is ready to be used
      *
-     * @type Function
+     * @type {Function}
      */
     onStoreReady: null,
 
@@ -237,14 +250,14 @@
      * The callback to be called if an error occurred during instantiation
      * of the store
      *
-     * @type Function
+     * @type {Function}
      */
     onError: null,
 
     /**
      * The internal insertID counter
      *
-     * @type Number
+     * @type {Number}
      * @private
      */
     _insertIdCount: 0,
@@ -303,7 +316,7 @@
         if(!this.db.objectStoreNames.contains(this.storeName)){
           // We should never ever get here.
           // Lets notify the user anyway.
-          this.onError(new Error('Something is wrong with the IndexedDB implementation in this browser. Please upgrade your browser.'));
+          this.onError(new Error('Object store couldn\'t be created.'));
           return;
         }
 
@@ -583,6 +596,8 @@
 
       if(Object.prototype.toString.call(dataArray) != '[object Array]'){
         onError(new Error('dataArray argument must be of type Array.'));
+      } else if (dataArray.length === 0) {
+        return onSuccess(true);
       }
       var batchTransaction = this.db.transaction([this.storeName] , this.consts.READ_WRITE);
       batchTransaction.oncomplete = function () {
@@ -823,8 +838,10 @@
       onSuccess || (onSuccess = defaultSuccessHandler);
       arrayType || (arrayType = 'sparse');
 
-      if(Object.prototype.toString.call(keyArray) != '[object Array]'){
+      if (Object.prototype.toString.call(keyArray) != '[object Array]'){
         onError(new Error('keyArray argument must be of type Array.'));
+      } else if (keyArray.length === 0) {
+        return onSuccess([]);
       }
       var batchTransaction = this.db.transaction([this.storeName] , this.consts.READ_ONLY);
       batchTransaction.oncomplete = function () {
@@ -1007,7 +1024,7 @@
      * @private
      */
     _addIdPropertyIfNeeded: function (dataObj) {
-      if (!this.features.hasAutoIncrement && typeof dataObj[this.keyPath] == 'undefined') {
+      if (typeof dataObj[this.keyPath] == 'undefined') {
         dataObj[this.keyPath] = this._insertIdCount++ + Date.now();
       }
     },
@@ -1331,8 +1348,6 @@
   };
 
   /** helpers **/
-
-  // TODO: Check Object.create support to get rid of this
   var empty = {};
   var mixin = function (target, source) {
     var name, s;
