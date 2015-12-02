@@ -25,8 +25,7 @@
     throw error;
   };
   var defaultSuccessHandler = function () {};
-  var defaultVersionChangeHandler = function () {};
-
+  
   var defaults = {
     storeName: 'Store',
     storePrefix: 'IDBWrapper-',
@@ -379,11 +378,6 @@
           }
           this.store = this.db.createObjectStore(this.storeName, optionalParameters);
         }
-
-        /**
-         * Trigger onVersionChange method
-         */
-        this.onVersionChange(this.store, event);
 
         var existingIndexes = Array.prototype.slice.call(this.getIndexList());
         this.indexes.forEach(function(indexData){
