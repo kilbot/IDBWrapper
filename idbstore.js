@@ -278,6 +278,11 @@
 
       var openRequest = this.idb.open(this.dbName, this.dbVersion);
       var preventSuccessCallback = false;
+      
+      if( openRequest === null ){
+        this.onError(new Error('Cannot open database ' + this.dbName + '.'));
+        return;
+      }
 
       openRequest.onerror = function (error) {
 
